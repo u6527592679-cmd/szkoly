@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Baza Szkół (Gemini 2) - Zespoły i Szkoły Samodzielne</title>
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script type="text/javascript" src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f8f9fa; padding: 20px; }
+        .container { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h2 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-top: 0; }
+        th { background-color: #007bff; color: white; text-align: left; padding: 10px !important; }
+        td { padding: 10px !important; vertical-align: middle; }
+        .select-handlowiec { padding: 5px; border-radius: 4px; border: 1px solid #ccc; width: 100%; min-width: 150px; font-weight: bold; color: #333; }
+        .parent-select { background-color: #e8f5e9; border: 1px solid #4caf50; }
+        .header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        
+        .counters-container { display: flex; gap: 15px; margin-bottom: 15px; background: #fff3cd; padding: 10px 15px; border-radius: 8px; border: 1px solid #ffeeba; align-items: center; font-size: 15px; font-weight: bold; color: #856404; flex-wrap: wrap; }
+        .counters-container div { background: white; padding: 5px 10px; border-radius: 5px; border: 1px solid #ffeeba; }
+        .counters-container span { color: #d39e00; font-size: 18px; margin-left: 5px; }
+
+        .filter-section { background-color: #f1f8ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #cce5ff; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+        .filter-section div { display: flex; align-items: center; }
+        .filter-section select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; width: 220px; font-size: 14px; margin-left: 10px; }
+        .btn { background-color: #28a745; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; text-decoration: none; }
+        .btn:hover { background-color: #218838; }
+        .btn-danger { background-color: #dc3545; margin-left: 10px; }
+        .btn-danger:hover { background-color: #c82333; }
+        
+        .btn-expand { background-color: #e9ecef; border-radius: 4px; padding: 2px; border: 1px solid #ced4da; width: 25px; display: inline-block; user-select: none; text-align: center; }
+        .child-table { width: 100%; background-color: #f1f8ff; border-collapse: collapse; margin: 10px 0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .child-table th { background-color: #6c757d; font-size: 0.85em; text-transform: uppercase; padding: 8px !important; }
+        .child-table td { border: 1px solid #dee2e6; font-size: 0.9em; padding: 8px !important; }
+        .child-row-bg { background-color: #f8fbff !important; }
+        .independent-row { background-color: #fffdf5; }
+
+        .summary-bar { background-color: #343a40; color: white; padding: 15px; border-radius: 8px; display: flex; justify-content: space-around; font-size: 16px; margin-top: 20px; }
+        .summary-bar div span { font-size: 20px; font-weight: bold; color: #ffc107; margin-left: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-actions">
+            <div>
+                <h2>🏫 Baza Szkół (Plik: Gemini 2)</h2>
+                <p>Zespoły szkół są zgrupowane (ikona ➕). Szkoły samodzielne są oznaczone ikoną 📄.</p>
+            </div>
+            <div>
+                <button id="eksport_btn" class="btn">📥 Pobierz tabelę jako CSV</button>
+                <button id="wyczysc_btn" class="btn btn-danger">🗑️ Wyczyść zapisy</button>
+            </div>
+        </div>
+
+        <!-- Liczniki przypisanych szkół -->
+        <div class="counters-container">
+            <strong>📊 Wybranych szkół: </strong>
+            <div>KK: <span id="cnt_KK">0</span></div>
+            <div>KS: <span id="cnt_KS">0</span></div>
+            <div>KB: <span id="cnt_KB">0</span></div>
+            <div>MB: <span id="cnt_MB">0</span></div>
+            <div>SS: <span id="cnt_SS">0</span></div>
+        </div>
+
+        <!-- Filtry -->
+        <div class="filter-section">
+            <div>
+                <label for="typ_filter"><strong>🏫 Typ szkoły:</strong></label>
+                <select id="typ_filter"><option value="">Wszystkie (Brak filtru)</option></select>
+            </div>
+            <div>
+                <label for="powiat_filter"><strong>🗺️ Powiat:</strong></label>
+                <select id="powiat_filter"><option value="">Wszystkie (Brak filtru)</option></select>
+            </div>
+            <div>
+                <label for="gmina_filter"><strong>📍 Gmina:</strong></label>
+                <select id="gmina_filter"><option value="">Wszystkie (Brak filtru)</option></select>
+            </div>
+        </div>
+
+        <table id="tabela_szkol" class="display" style="width:100%">
+            <thead>
+                <tr>
+                    <th style="width: 50px; text-align: center;">Rozwiń</th>
+                    <th style="width: 200px;">Wybierz Opiekuna</th>
+                    <th>Placówka Nadrzędna / Samodzielna Szkoła</th>
+                    <th>Typ szkoły</th>
+                    <th>Powiaty</th>
+                    <th>Gminy</th>
+                    <th style="width: 60px;">Szkół</th>
+                </tr>
+            </thead>
+        </table>
+
+        <!-- Podsumowanie -->
+        <div class="summary-bar">
+            <div>Łącznie wszystkich szkół: <span>1440</span></div>
+            <div>Grup / Zespołów Szkół: <span>357</span></div>
+            <div>Szkół samodzielnych: <span>868</span></div>
+        </div>
+    </div>
+
+    <script>
+       
+        // Generowanie list do filtrów
+        $(document).ready(function() {
+            var uniquePowiaty = new Set();
+            var uniqueGminy = new Set();
+            var uniqueTypy = new Set();
+            
+            tableData.forEach(function(d) {
+                if(d.powiaty) d.powiaty.split(', ').forEach(p => { if(p.trim()) uniquePowiaty.add(p.trim()); });
+                if(d.gminy) d.gminy.split(', ').forEach(g => { if(g.trim()) uniqueGminy.add(g.trim()); });
+                if(d.typy) d.typy.split(', ').forEach(t => { if(t.trim()) uniqueTypy.add(t.trim()); });
+            });
+            
+            Array.from(uniqueTypy).sort().forEach(t => $('#typ_filter').append('<option value="'+t+'">'+t+'</option>'));
+            Array.from(uniquePowiaty).sort().forEach(p => $('#powiat_filter').append('<option value="'+p+'">'+p+'</option>'));
+            Array.from(uniqueGminy).sort().forEach(g => $('#gmina_filter').append('<option value="'+g+'">'+g+'</option>'));
+        });
+
+        // Funkcja aktualizująca liczniki
+        function updateCounters() {
+            var counts = { 'KK': 0, 'KS': 0, 'KB': 0, 'MB': 0, 'SS': 0 };
+            
+            tableData.forEach(function(parent) {
+                parent.children.forEach(function(child) {
+                    var childId = parent.parent_id + '_' + child.regon;
+                    var val = localStorage.getItem(LS_PREFIX + childId);
+                    if (val && counts[val] !== undefined) {
+                        counts[val]++;
+                    }
+                });
+            });
+
+            $('#cnt_KK').text(counts['KK']);
+            $('#cnt_KS').text(counts['KS']);
+            $('#cnt_KB').text(counts['KB']);
+            $('#cnt_MB').text(counts['MB']);
+            $('#cnt_SS').text(counts['SS']);
+        }
+
+        function formatChildTable(d) {
+            var html = '<table class="child-table" cellpadding="5" cellspacing="0" border="0">';
+            html += '<tr><th>Opiekun (Tylko ta szkoła)</th><th>REGON</th><th>Nazwa Szkoły</th><th>Typ</th><th>Powiat</th><th>Gmina</th><th>Miejscowość</th><th>Kontakt</th></tr>';
+            
+            d.children.forEach(function(child) {
+                var childId = d.parent_id + '_' + child.regon;
+                var savedChildVal = localStorage.getItem(LS_PREFIX + childId) || '';
+                
+                var selectHtml = '<select class="form-select select-handlowiec child-select" data-parent="' + d.parent_id + '" data-id="' + childId + '">';
+                selectHtml += '<option value="">(Osobno)...</option>';
+                selectHtml += '<option value="KK" ' + (savedChildVal === 'KK' ? 'selected' : '') + '>KK</option>';
+                selectHtml += '<option value="KS" ' + (savedChildVal === 'KS' ? 'selected' : '') + '>KS</option>';
+                selectHtml += '<option value="KB" ' + (savedChildVal === 'KB' ? 'selected' : '') + '>KB</option>';
+                selectHtml += '<option value="MB" ' + (savedChildVal === 'MB' ? 'selected' : '') + '>MB</option>';
+                selectHtml += '<option value="SS" ' + (savedChildVal === 'SS' ? 'selected' : '') + '>SS</option>';
+                
+                selectHtml += '</select>';
+
+                var kontakt = "";
+                if(child.email) kontakt += child.email + "<br>";
+                if(child.www) kontakt += "<a href='http://" + child.www.replace('http://','') + "' target='_blank'>WWW</a>";
+
+                html += '<tr>';
+                html += '<td>' + selectHtml + '</td>';
+                html += '<td>' + child.regon + '</td>';
+                html += '<td><b>' + child.nazwa_szkoly + '</b><br><small>' + child.adres + '</small></td>';
+                html += '<td>' + child.typ + '</td>';
+                html += '<td>' + child.powiat + '</td>';
+                html += '<td>' + child.gmina + '</td>';
+                html += '<td>' + child.miejscowosc + '</td>';
+                html += '<td>' + kontakt + '</td>';
+                html += '</tr>';
+            });
+            
+            html += '</table>';
+            return html;
+        }
+
+        $(document).ready(function() {
+            // Custom Search
+            $.fn.dataTable.ext.search.push(
+                function( settings, data, dataIndex ) {
+                    var selectedPowiat = $('#powiat_filter').val();
+                    var selectedGmina = $('#gmina_filter').val();
+                    var selectedTyp = $('#typ_filter').val();
+                    
+                    var typyList = data[3] || "";
+                    var powiatyList = data[4] || "";
+                    var gminyList = data[5] || "";
+                    
+                    var matchTyp = selectedTyp === "" || typyList.includes(selectedTyp);
+                    var matchPowiat = selectedPowiat === "" || powiatyList.includes(selectedPowiat);
+                    var matchGmina = selectedGmina === "" || gminyList.includes(selectedGmina);
+                    
+                    return matchTyp && matchPowiat && matchGmina;
+                }
+            );
+
+            var table = $('#tabela_szkol').DataTable({
+                "language": { "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/pl.json" },
+                "data": tableData,
+                "createdRow": function(row, data, dataIndex) {
+                    if(!data.is_group) $(row).addClass('independent-row');
+                },
+                "columns": [
+                    {
+                        "orderable": false,
+                        "data": null,
+                        "render": function(data, type, row) {
+                            if (row.is_group) return '<div class="btn-expand" style="cursor:pointer;">➕</div>';
+                            return '<div style="color:#ccc; text-align:center;">➖</div>';
+                        }
+                    },
+                    { 
+                        "data": null,
+                        "orderable": false,
+                        "render": function(data, type, row) {
+                            if (row.is_group) {
+                                var parentId = row.parent_id;
+                                var savedVal = localStorage.getItem(LS_PREFIX + 'parent_' + parentId) || '';
+                                var selectHtml = '<select class="form-select select-handlowiec parent-select" data-parent="' + parentId + '">';
+                                selectHtml += '<option value="">Cała grupa...</option>';
+                                selectHtml += '<option value="KK" ' + (savedVal === 'KK' ? 'selected' : '') + '>KK</option>';
+                            selectHtml += '<option value="KS" ' + (savedVal === 'KS' ? 'selected' : '') + '>KS</option>';
+                            selectHtml += '<option value="KB" ' + (savedVal === 'KB' ? 'selected' : '') + '>KB</option>';
+                            selectHtml += '<option value="MB" ' + (savedVal === 'MB' ? 'selected' : '') + '>MB</option>';
+                            selectHtml += '<option value="SS" ' + (savedVal === 'SS' ? 'selected' : '') + '>SS</option>';
+                            
+                                selectHtml += '</select>';
+                                return selectHtml;
+                            } else {
+                                var child = row.children[0];
+                                var childId = row.parent_id + '_' + child.regon;
+                                var savedChildVal = localStorage.getItem(LS_PREFIX + childId) || '';
+                                var selectHtml = '<select class="form-select select-handlowiec child-select" data-parent="' + row.parent_id + '" data-id="' + childId + '">';
+                                selectHtml += '<option value="">Wybierz...</option>';
+                                selectHtml += '<option value="KK" ' + (savedChildVal === 'KK' ? 'selected' : '') + '>KK</option>';
+                selectHtml += '<option value="KS" ' + (savedChildVal === 'KS' ? 'selected' : '') + '>KS</option>';
+                selectHtml += '<option value="KB" ' + (savedChildVal === 'KB' ? 'selected' : '') + '>KB</option>';
+                selectHtml += '<option value="MB" ' + (savedChildVal === 'MB' ? 'selected' : '') + '>MB</option>';
+                selectHtml += '<option value="SS" ' + (savedChildVal === 'SS' ? 'selected' : '') + '>SS</option>';
+                
+                                selectHtml += '</select>';
+                                return selectHtml;
+                            }
+                        }
+                    },
+                    { "data": "nazwa_nadrzedna" },
+                    { 
+                        "data": "typy",
+                        "render": function(data, type, row) {
+                            if(data.length > 50) return data.substring(0, 50) + "...";
+                            return data;
+                        }
+                    },
+                    { "data": "powiaty" },
+                    { "data": "gminy" },
+                    { "data": "liczba_szkol" }
+                ],
+                "paging": false,
+                "scrollY": "55vh",
+                "scrollCollapse": true,
+                "order": [[2, 'asc']]
+            });
+
+            $('#powiat_filter, #gmina_filter, #typ_filter').on('change', function() { table.draw(); });
+
+            $('#tabela_szkol tbody').on('click', '.btn-expand', function () {
+                var tr = $(this).closest('tr');
+                var row = table.row( tr );
+                if(!row.data().is_group) return;
+
+                if ( row.child.isShown() ) {
+                    row.child.hide();
+                    tr.removeClass('shown');
+                    $(this).html('➕');
+                }
+                else {
+                    row.child( formatChildTable(row.data()) ).show();
+                    tr.addClass('shown');
+                    tr.next().addClass('child-row-bg');
+                    $(this).html('➖');
+                }
+            });
+
+            $('#tabela_szkol tbody').on('change', '.parent-select', function() {
+                var parentId = $(this).data('parent');
+                var val = $(this).val();
+                
+                if(val) localStorage.setItem(LS_PREFIX + 'parent_' + parentId, val);
+                else localStorage.removeItem(LS_PREFIX + 'parent_' + parentId);
+
+                var rowData = tableData.find(d => d.parent_id === parentId);
+                rowData.children.forEach(function(child) {
+                    var childId = parentId + '_' + child.regon;
+                    if(val) localStorage.setItem(LS_PREFIX + childId, val);
+                    else localStorage.removeItem(LS_PREFIX + childId);
+                });
+
+                var tr = $(this).closest('tr');
+                var row = table.row(tr);
+                if (row.child.isShown()) row.child().find('.child-select').val(val);
+                
+                updateCounters();
+            });
+
+            $('#tabela_szkol tbody').on('change', '.child-select', function() {
+                var parentId = $(this).data('parent');
+                var childId = $(this).data('id');
+                var val = $(this).val();
+                
+                if(val) localStorage.setItem(LS_PREFIX + childId, val);
+                else localStorage.removeItem(LS_PREFIX + childId);
+                
+                var rowData = tableData.find(d => d.parent_id === parentId);
+                
+                if (rowData.is_group) {
+                    var allSame = true;
+                    var firstVal = localStorage.getItem(LS_PREFIX + rowData.parent_id + '_' + rowData.children[0].regon) || '';
+                    
+                    for(var i=0; i<rowData.children.length; i++) {
+                        var cVal = localStorage.getItem(LS_PREFIX + rowData.parent_id + '_' + rowData.children[i].regon) || '';
+                        if (cVal !== firstVal) { allSame = false; break; }
+                    }
+
+                    var parentSelect = $('select.parent-select[data-parent="' + parentId + '"]');
+                    if(allSame && firstVal !== '') {
+                        localStorage.setItem(LS_PREFIX + 'parent_' + parentId, firstVal);
+                        parentSelect.val(firstVal);
+                    } else {
+                        localStorage.removeItem(LS_PREFIX + 'parent_' + parentId);
+                        parentSelect.val('');
+                    }
+                }
+                
+                updateCounters();
+            });
+
+            $('#eksport_btn').on('click', function() {
+                var csv = [];
+                csv.push('"Opiekun";"Placówka Nadrzędna";"REGON";"Nazwa Szkoły";"Typ";"Powiat";"Gmina";"Miejscowość";"Adres";"E-mail";"WWW"');
+
+                tableData.forEach(function(parent) {
+                    parent.children.forEach(function(child) {
+                        var childId = parent.parent_id + '_' + child.regon;
+                        var childHandlowiec = localStorage.getItem(LS_PREFIX + childId) || '';
+                        var nazwaNadrzedna = parent.is_group ? parent.nazwa_nadrzedna : "";
+                        
+                        var row = [
+                            '"' + childHandlowiec + '"',
+                            '"' + nazwaNadrzedna.replace(/"/g, '""') + '"',
+                            '"' + child.regon + '"',
+                            '"' + child.nazwa_szkoly.replace(/"/g, '""') + '"',
+                            '"' + child.typ.replace(/"/g, '""') + '"',
+                            '"' + child.powiat.replace(/"/g, '""') + '"',
+                            '"' + child.gmina.replace(/"/g, '""') + '"',
+                            '"' + child.miejscowosc.replace(/"/g, '""') + '"',
+                            '"' + child.adres.replace(/"/g, '""') + '"',
+                            '"' + child.email.replace(/"/g, '""') + '"',
+                            '"' + child.www.replace(/"/g, '""') + '"'
+                        ];
+                        csv.push(row.join(';'));
+                    });
+                });
+
+                var csvString = csv.join('\n');
+                var blob = new Blob(["\uFEFF" + csvString], { type: 'text/csv;charset=utf-8;' });
+                var link = document.createElement("a");
+                var url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", "Baza_Szkol_Gemini_2.csv");
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+
+            $('#wyczysc_btn').on('click', function() {
+                if(confirm("Czy na pewno chcesz usunąć wszystkie przypisania z pamięci?")) {
+                    var keysToRemove = [];
+                    for(var i=0; i<localStorage.length; i++) {
+                        var key = localStorage.key(i);
+                        if(key.startsWith(LS_PREFIX)) {
+                            keysToRemove.push(key);
+                        }
+                    }
+                    keysToRemove.forEach(k => localStorage.removeItem(k));
+                    
+                    $('.select-handlowiec').val('');
+                    updateCounters();
+                    alert("Pamięć wyczyszczona!");
+                }
+            });
+
+            // Uruchomienie licznika przy pierwszym załadowaniu strony
+            updateCounters();
+        });
+    </script>
+</body>
+</html>
